@@ -1,14 +1,8 @@
 // Advanced YouTube operations - channel and playlist queries
+// All API calls go through /api/youtube-proxy to avoid API key exposure and 403 errors
 
 import axios from 'axios';
 import { extractVideoId } from './youtube';
-
-const DEFAULT_API_KEY = import.meta.env.VITE_DEFAULT_YOUTUBE_API_KEY;
-
-const getApiKey = () => {
-    const userKey = localStorage.getItem('youtube_api_key');
-    return userKey || DEFAULT_API_KEY;
-};
 
 export const extractChannelId = (channelUrl) => {
     // Extract channel ID from various YouTube channel URL formats
@@ -33,11 +27,6 @@ export const extractPlaylistId = (playlistUrl) => {
 };
 
 export const getChannelLivestreams = async (channelUrl) => {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        throw new Error('YouTube API key required');
-    }
-
     try {
         const channelInfo = extractChannelId(channelUrl);
         if (!channelInfo) {
@@ -48,17 +37,17 @@ export const getChannelLivestreams = async (channelUrl) => {
 
         // If we have a username, we need to resolve it to a channel ID first
         if (channelInfo.type !== 'id') {
-            const searchResponse = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+            const searchResponse = await axios.get('/api/youtube-proxy', {
                 params: {
+                    endpoint: 'search',
                     part: 'snippet',
                     q: channelInfo.id,
                     type: 'channel',
-                    maxResults: 1,
-                    key: apiKey
+                    maxResults: 1
                 }
             });
 
-            if (searchResponse.data.items.length === 0) {
+            if (!searchResponse.data.items || searchResponse.data.items.length === 0) {
                 throw new Error('Channel not found');
             }
 
@@ -66,43 +55,43 @@ export const getChannelLivestreams = async (channelUrl) => {
         }
 
         // Search for live and upcoming broadcasts on this channel
-        const response = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+        const response = await axios.get('/api/youtube-proxy', {
             params: {
+                endpoint: 'search',
                 part: 'snippet',
                 channelId: channelId,
                 eventType: 'live',
                 type: 'video',
-                maxResults: 10,
-                key: apiKey
+                maxResults: 10
             }
         });
 
-        const liveStreams = response.data.items.map(item => ({
+        const liveStreams = (response.data.items || []).map(item => ({
             videoId: item.id.videoId,
             title: item.snippet.title,
             description: item.snippet.description,
-            thumbnail: item.snippet.thumbnails.default.url,
+            thumbnail: item.snippet.thumbnails?.default?.url,
             publishedAt: item.snippet.publishedAt,
             url: `https://www.youtube.com/watch?v=${item.id.videoId}`
         }));
 
         // Also check for upcoming streams
-        const upcomingResponse = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+        const upcomingResponse = await axios.get('/api/youtube-proxy', {
             params: {
+                endpoint: 'search',
                 part: 'snippet',
                 channelId: channelId,
                 eventType: 'upcoming',
                 type: 'video',
-                maxResults: 10,
-                key: apiKey
+                maxResults: 10
             }
         });
 
-        const upcomingStreams = upcomingResponse.data.items.map(item => ({
+        const upcomingStreams = (upcomingResponse.data.items || []).map(item => ({
             videoId: item.id.videoId,
             title: item.snippet.title,
             description: item.snippet.description,
-            thumbnail: item.snippet.thumbnails.default.url,
+            thumbnail: item.snippet.thumbnails?.default?.url,
             publishedAt: item.snippet.publishedAt,
             url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
             upcoming: true
@@ -116,31 +105,26 @@ export const getChannelLivestreams = async (channelUrl) => {
 };
 
 export const getPlaylistVideos = async (playlistUrl, eventStartDate) => {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        throw new Error('YouTube API key required');
-    }
-
     try {
         const playlistId = extractPlaylistId(playlistUrl);
         if (!playlistId) {
             throw new Error('Invalid playlist URL');
         }
 
-        const response = await axios.get('https://www.googleapis.com/youtube/v3/playlistItems', {
+        const response = await axios.get('/api/youtube-proxy', {
             params: {
+                endpoint: 'playlistItems',
                 part: 'snippet',
                 playlistId: playlistId,
-                maxResults: 50,
-                key: apiKey
+                maxResults: 50
             }
         });
 
-        const videos = response.data.items.map(item => ({
+        const videos = (response.data.items || []).map(item => ({
             videoId: item.snippet.resourceId.videoId,
             title: item.snippet.title,
             description: item.snippet.description,
-            thumbnail: item.snippet.thumbnails.default.url,
+            thumbnail: item.snippet.thumbnails?.default?.url,
             publishedAt: item.snippet.publishedAt,
             url: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`
         }));
@@ -167,22 +151,19 @@ export const getPlaylistVideos = async (playlistUrl, eventStartDate) => {
 };
 
 export const validateVideoUrl = async (videoUrl) => {
-    const apiKey = getApiKey();
-    if (!apiKey) return { valid: false, reason: 'No API key' };
-
     try {
         const videoId = extractVideoId(videoUrl);
         if (!videoId) return { valid: false, reason: 'Invalid URL' };
 
-        const response = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
+        const response = await axios.get('/api/youtube-proxy', {
             params: {
+                endpoint: 'videos',
                 part: 'snippet,liveStreamingDetails',
-                id: videoId,
-                key: apiKey
+                id: videoId
             }
         });
 
-        if (response.data.items.length === 0) {
+        if (!response.data.items || response.data.items.length === 0) {
             return { valid: false, reason: 'Video not found' };
         }
 
@@ -193,7 +174,7 @@ export const validateVideoUrl = async (videoUrl) => {
             valid: true,
             isLive,
             title: video.snippet.title,
-            thumbnail: video.snippet.thumbnails.default.url
+            thumbnail: video.snippet.thumbnails?.default?.url
         };
     } catch (error) {
         console.error('Error validating video:', error);

@@ -1,30 +1,27 @@
 import axios from 'axios';
 
-const DEFAULT_API_KEY = import.meta.env.VITE_DEFAULT_YOUTUBE_API_KEY;
-
 export const extractVideoId = (url) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|live\/|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
+/**
+ * Fetches YouTube stream start time via backend proxy to avoid API key exposure and 403 errors.
+ */
 export const getStreamStartTime = async (videoId) => {
-    const userKey = localStorage.getItem('youtube_api_key');
-    const apiKey = userKey || DEFAULT_API_KEY;
-
-    if (!apiKey) return null;
-
     try {
-        const response = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
+        // Use backend proxy to avoid API key restrictions
+        const response = await axios.get('/api/youtube-proxy', {
             params: {
+                endpoint: 'videos',
                 part: 'liveStreamingDetails',
                 id: videoId,
-                key: apiKey,
             },
         });
 
         const items = response.data.items;
-        if (items.length > 0 && items[0].liveStreamingDetails) {
+        if (items && items.length > 0 && items[0].liveStreamingDetails) {
             const details = items[0].liveStreamingDetails;
 
             // Stream has actually started
