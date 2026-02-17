@@ -31,6 +31,31 @@ export const getEventBySku = async (sku) => {
     throw new Error('Event not found');
 };
 
+export const searchEvents = async (query) => {
+    const client = getClient();
+    // Check if it's a SKU
+    const skuMatch = query.match(/(RE-[A-Z0-9]+-\d{2}-\d{4})/);
+    if (skuMatch) {
+        // Return as an array to match search results format
+        try {
+            const event = await getEventBySku(skuMatch[1]);
+            return [event];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // Search by name
+    const response = await client.get('/events', {
+        params: {
+            name: query,
+            per_page: 20
+        },
+    });
+
+    return response.data.data;
+};
+
 export const getTeamByNumber = async (number) => {
     const client = getClient();
     const response = await client.get('/teams', {
