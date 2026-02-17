@@ -666,6 +666,40 @@ function Viewer() {
         }
     };
 
+    const performSearch = async (query) => {
+        if (!query.trim()) {
+            setSearchResults([]);
+            setShowSearchResults(false);
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const results = await searchEvents(query);
+            setSearchResults(results);
+            setShowSearchResults(true); // Always show, empty list handling in UI if needed
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    // Debounced Search Effect
+    useEffect(() => {
+        // Don't auto-search if deep linking or if it looks like a SKU (let user finish typing or hit enter for SKU)
+        if (isDeepLinking || !eventUrl.trim()) return;
+
+        const timer = setTimeout(() => {
+            // Check if it matches SKU pattern to avoid searching for partial SKUs unnecessarily?
+            // Actually, we WANT to search names. SKU detection happens on 'Enter' or click.
+            // If it IS a SKU, performSearch will return it as a result anyway (searchEvents handles SKU).
+            performSearch(eventUrl);
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [eventUrl, isDeepLinking]);
+
     const handleEventSearch = async () => {
         if (!eventUrl.trim()) {
             setError('Please enter an event URL or search term');
@@ -674,29 +708,15 @@ function Viewer() {
 
         setShowSearchResults(false);
 
-        // Check for SKU pattern match first
+        // Check for SKU pattern match first for direct load
         const skuMatch = eventUrl.match(/(RE-[A-Z0-9]+-\d{2}-\d{4})/);
         if (skuMatch) {
             await loadEvent(skuMatch[1]);
             return;
         }
 
-        // Otherwise perform search
-        setIsSearching(true);
-        setError('');
-        try {
-            const results = await searchEvents(eventUrl);
-            setSearchResults(results);
-            if (results.length === 0) {
-                setError('No events found.');
-            } else {
-                setShowSearchResults(true);
-            }
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setIsSearching(false);
-        }
+        // Force immediate search if not SKU
+        performSearch(eventUrl);
     };
 
     const handleWebcastSelect = (selectedVideoId, selectedUrl, method) => {
@@ -1620,7 +1640,7 @@ function Viewer() {
                     {/* Right Column: Controls */}
                     <div className="xl:col-span-4 flex flex-col gap-4">
                         {/* Event Search Section */}
-                        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex-shrink-0">
+                        <div className="bg-gray-900 border border-gray-800 rounded-xl flex-shrink-0">
                             <button
                                 onClick={() => setIsEventSearchCollapsed(!isEventSearchCollapsed)}
                                 className="w-full p-4 flex justify-between items-center hover:bg-gray-800/50 transition-colors"

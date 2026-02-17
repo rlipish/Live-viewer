@@ -53,7 +53,25 @@ export const searchEvents = async (query) => {
         },
     });
 
-    return response.data.data;
+    const results = response.data.data || [];
+
+    // Sort results to prioritize Signature events and relevance
+    return results.sort((a, b) => {
+        // 1. Prioritize 'Signature' level
+        const aSig = a.level === 'Signature';
+        const bSig = b.level === 'Signature';
+        if (aSig && !bSig) return -1;
+        if (!aSig && bSig) return 1;
+
+        // 2. Prioritize exact name matches
+        const aExact = a.name.toLowerCase() === query.toLowerCase();
+        const bExact = b.name.toLowerCase() === query.toLowerCase();
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+
+        // 3. Sort by date (newest first)
+        return new Date(b.start) - new Date(a.start);
+    });
 };
 
 export const getTeamByNumber = async (number) => {
