@@ -3,6 +3,7 @@
 ![Vercel Analytics Enabled](https://img.shields.io/badge/Vercel%20Analytics-enabled-brightgreen)
 
 
+(This is RoboSTEM Foundation's app, but Vercel Free only allows personal accounts so I'll keep it here for now)
 A web app for watching VEX competition livestreams without digging through long recordings.
 
 VEX Match Jumper lets you load a competition from RobotEvents and jump directly to individual matches inside the official YouTube livestream. It is built for reviewing matches, scouting teams, and quickly finding specific games after an event.
